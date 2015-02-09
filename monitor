@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+require 'brewery_control_system'
+require 'aws-sdk'
+
+def setpoint_changes(previous, current)
+  changes = []
+  previous.each_with_index do |probe,i|
+    if probe.name != current[i].name
+      changes << "#{probe.name} changed names to #{current[i].name}"
+    end
+    if probe.setpoint != current[i].setpoint
+      changes << "#{probe.name} changed setpoint from #{probe.setpoint} to #{current[i].setpoint}"
+    end
+  end
+  changes
+end
+
+base_url = 'http://10.0.0.254/'
+
+begin 
+  bcs = NRB::BreweryControlSystem.new base_url: base_url
+  puts "Monitoring #{bcs.name}"
+  previous = bcs.temp_probes
+rescue Faraday::ConnectionFailed => e
+  puts e.to_s
+end
+
+sns = Aws::SNS::Client.new access_key_id: 'AKIAJ4ILFGPMRT2SYMDA',
+                           region: 'us-east-1',
+                           secret_access_key: '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'
+
+topic_arn = 'arn:aws:sns:us-east-1:253146172237:bcs-crit'
+
+pause = 5
+
+while true do
+  sleep pause
+  begin
+    current = bcs.temp_probes
+    changes = setpoint_changes(previous, current)
+    unless changes.empty?
+      message = "#{Time.now} #{changes.inspect}"
+      puts message
+      sns.publish topic_arn: topic_arn,
+                  message: message
+    end
+    previous = current
+  rescue Aws::SNS::Errors::ServiceError => e
+    puts "#{Time.now} #{e}"
+  rescue Faraday::ConnectionFailed => e
+    message = "#{Time.now} #{e}"
+    puts message
+    sns.publish topic_arn: topic_arn,
+                message: message
+  end
+end
