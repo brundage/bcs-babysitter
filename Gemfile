@@ -1,3 +1,5 @@
 source 'http://rubygems.org'
+gem 'activerecord'
 gem 'aws-sdk', '2.0.6.pre'
 gem 'bcs-interrogator'
+gem 'sqlite3'

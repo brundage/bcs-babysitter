@@ -1,5 +1,7 @@
 module NRB
 
+  autoload :LogEntry, 'log_entry'
+
   class BCSBabysitter
 
     attr_accessor :pause
@@ -18,25 +20,16 @@ module NRB
 
     def monitor
       while true do
-        sleep pause unless previous.nil?
         begin
           self.current = bcs.temp_probes
           changes = setpoint_changes
-          unless changes.empty?
-            message = "#{Time.now} #{changes.inspect}"
-            puts message
-            sns.publish topic_arn: topic_arn,
-                        message: message
-          end
+          alert changes: changes
           self.previous = current
-        rescue Aws::SNS::Errors::ServiceError => e
-          puts "#{Time.now} #{e}"
         rescue Faraday::ConnectionFailed => e
           message = "#{Time.now} #{e}"
-          puts message
-          sns.publish topic_arn: topic_arn,
-                      message: message
+          alert message: message
         end
+        sleep pause
       end
     end
 
@@ -58,6 +51,22 @@ module NRB
   private
 
     attr_accessor :bcs, :current, :previous, :sns, :topic_arn
+
+    def alert(changes: [], message: nil)
+      if message.nil?
+        if changes.empty?
+          return
+        else
+          message = "#{Time.now} #{changes.inspect}"
+        end
+      end
+      puts message
+      begin
+        sns.publish topic_arn: topic_arn, message: message
+      rescue Aws::SNS::Errors::ServiceError => e
+        puts "#{Time.now} #{e}"
+      end
+    end
 
   end
 

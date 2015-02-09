@@ -4,6 +4,7 @@
 lib = File.expand_path(File.join('..','..','lib'), __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
+require 'active_record'
 require 'bcs_babysitter'
 require 'brewery_control_system'
 require 'aws-sdk'
@@ -11,16 +12,16 @@ require 'yaml'
 
 aws_config = YAML.load(File.read(File.expand_path(File.join('..','..','aws.yml'), __FILE__)))
 sns = Aws::SNS::Client.new aws_config
+topic_arn = 'arn:aws:sns:us-east-1:253146172237:bcs-crit'
 
-base_url = 'http://10.0.0.254/'
-
+bcs_url = 'http://10.0.0.254/'
 begin 
-  bcs = NRB::BreweryControlSystem.new base_url: base_url
+  bcs = NRB::BreweryControlSystem.new base_url: bcs_url
   puts "Monitoring #{bcs.name}"
 rescue Faraday::ConnectionFailed => e
   puts e.to_s
 end
 
-babysitter = NRB::BCSBabysitter.new bcs: bcs, sns: sns, topic_arn: 'arn:aws:sns:us-east-1:253146172237:bcs-crit'
+babysitter = NRB::BCSBabysitter.new bcs: bcs, sns: sns, topic_arn: topic_arn
 
 babysitter.monitor
